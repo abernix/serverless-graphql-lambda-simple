@@ -1,0 +1,630 @@
+frameworkVersion: ">=1.21.0 <2.0.0"
+
+service: graphql-simple
+provider:
+  name: aws
+  runtime: nodejs6.10
+  region: us-east-1
+  variableSyntax: "\\$${([ ~:a-zA-Z0-9._\\'\",\\-\\/\\(\\)]+?)}"
+
+functions:
+  query:
+    handler: handler.query
+
+resources:
+  Mappings:
+    SubnetConfig:
+      VPC:
+        CIDR: '10.0.0.0/16'
+      PublicOne:
+        CIDR: '10.0.0.0/24'
+  Resources:
+    VPC:
+      Metadata:
+        Description: >
+          VPC in which containers will be networked.
+          It has two public subnets, and two private subnets.
+          We distribute the subnets across the first two available subnets
+          for the region, for high availability.
+      Type: 'AWS::EC2::VPC'
+      Properties:
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        CidrBlock:
+          Fn::FindInMap: ['SubnetConfig', 'VPC', 'CIDR']
+    PublicSubnetOne:
+      Type: 'AWS::EC2::Subnet'
+      Metadata:
+        Description: >
+          One of two public subnets where containers will have
+          public IP addresses, and will route through the internet gateway
+      Properties:
+        AvailabilityZone:
+          Fn::Select:
+            - 0
+            - Fn::GetAZs:
+                Ref: 'AWS::Region'
+        VpcId:
+          Ref: 'VPC'
+        CidrBlock:
+          Fn::FindInMap: ['SubnetConfig', 'PublicOne', 'CIDR']
+        MapPublicIpOnLaunch: true
+    InternetGateway:
+      Type: 'AWS::EC2::InternetGateway'
+      Metadata:
+        Description: >
+          A networking resource for the public subnets, which allows the
+          containers which are bound to public subnets to reach the internet.
+    GatewayAttachement:
+      Type: 'AWS::EC2::VPCGatewayAttachment'
+      Properties:
+        VpcId:
+          Ref: 'VPC'
+        InternetGatewayId:
+          Ref: 'InternetGateway'
+    PublicRouteTable:
+      Type: 'AWS::EC2::RouteTable'
+      Metadata:
+        Description: A routing table for the containers in public subnets.
+      Properties:
+        VpcId:
+          Ref: 'VPC'
+    PublicRoute:
+      Type: 'AWS::EC2::Route'
+      Metadata:
+        Description: >
+          Containers in the public subnets have public IP addresses and
+          the routing table sends network traffic via the internet gateway
+      DependsOn: GatewayAttachement
+      Properties:
+        RouteTableId:
+          Ref: 'PublicRouteTable'
+        DestinationCidrBlock: '0.0.0.0/0'
+        GatewayId:
+          Ref: 'InternetGateway'
+    PublicSubnetOneRouteTableAssociation:
+      Type: 'AWS::EC2::SubnetRouteTableAssociation'
+      Properties:
+        SubnetId:
+          Ref: 'PublicSubnetOne'
+        RouteTableId:
+          Ref: 'PublicRouteTable'
+    NatGatewayOneAttachment:
+      Type: 'AWS::EC2::EIP'
+      Metadata:
+        Description: >
+          There are two private NAT gateways, one for each private subnet.
+      DependsOn: GatewayAttachement
+      Properties:
+          Domain: vpc
+    NatGatewayOne:
+      Type: 'AWS::EC2::NatGateway'
+      Properties:
+        AllocationId:
+          Fn::GetAtt: NatGatewayOneAttachment.AllocationId
+        SubnetId:
+          Ref: 'PublicSubnetOne'
+    EngineProxyUser:
+      Type: 'AWS::IAM::User'
+      Metadata:
+        Description: Make a user, because.
+      Properties:
+        Policies:
+          - PolicyName: engine-proxy-execute-lambda
+            PolicyDocument:
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'lambda:InvokeFunction'
+                  Resource:
+                    Fn::GetAtt: 'QueryLambdaFunction.Arn'
+    EngineProxyAccessKey:
+      Type: 'AWS::IAM::AccessKey'
+      Properties:
+        UserName:
+          Ref: 'EngineProxyUser'
+    ECSCluster:
+      Type: 'AWS::ECS::Cluster'
+    FargateContainerSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Metadata:
+        Description: >
+          A security group for the containers we will run in Fargate.
+          Three rules, allowing network traffic from a public facing load
+          balancer, a private internal load balancer, and from other members
+          of the security group.
+      Properties:
+        GroupDescription: Access to the Fargate containers
+        # TODO GET RID OF THIS.
+        SecurityGroupIngress:
+          -
+            IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: '0.0.0.0/0'
+          -
+            IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: '0.0.0.0/0'
+        VpcId:
+          Ref: 'VPC'
+    EcsSecurityGroupIngressFromPublicALB:
+      Type: 'AWS::EC2::SecurityGroupIngress'
+      Properties:
+        Description: Ingress from the public ALB
+        GroupId:
+          Ref: 'FargateContainerSecurityGroup'
+        IpProtocol: -1
+        SourceSecurityGroupId:
+          Ref: 'PublicLoadBalancerSG'
+    EcsSecurityGroupIngressFromSelf:
+      Type: 'AWS::EC2::SecurityGroupIngress'
+      Properties:
+        Description: Ingress from other containers in the same security group
+        GroupId:
+          Ref: 'FargateContainerSecurityGroup'
+        IpProtocol: -1
+        SourceSecurityGroupId:
+          Ref: 'FargateContainerSecurityGroup'
+    PublicLoadBalancerSG:
+      Type: 'AWS::EC2::SecurityGroup'
+      Metadata:
+        Description: >
+          A public facing load balancer, this is used for accepting traffic
+          from the public internet and directing it to public facing
+          microservices. Hosted in public subnets!
+      Properties:
+        GroupDescription: Access to the public facing load balancer
+        VpcId:
+          Ref: 'VPC'
+        SecurityGroupIngress:
+            - CidrIp: 0.0.0.0/0
+              IpProtocol: -1
+    PublicLoadBalancer:
+      Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+      Metadata:
+        Description: >
+          The load balancer is placed into the public subnets, so that traffic
+          from the internet can reach the load balancer directly via the IG.
+      Properties:
+        Scheme: internet-facing
+        LoadBalancerAttributes:
+          - Key: idle_timeout.timeout_seconds
+            Value: '30'
+        Subnets:
+          - Ref: 'PublicSubnetOne'
+        SecurityGroups:
+          - Ref: 'PublicLoadBalancerSG'
+    DummyTargetGroupPublic:
+      Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+      Metadata:
+        Description: >
+          A dummy target group is used to setup the ALB to just drop traffic
+          initially, before any real service target groups have been added.
+      Properties:
+        HealthCheckIntervalSeconds: 6
+        HealthCheckPath: /
+        HealthCheckProtocol: HTTP
+        HealthCheckTimeoutSeconds: 5
+        HealthyThresholdCount: 2
+        Name:
+          Fn::Join:
+            - '-'
+            -
+              - Ref: AWS::StackName
+              - 'drop-1'
+        Port: 80
+        Protocol: HTTP
+        UnhealthyThresholdCount: 2
+        VpcId:
+          Ref: 'VPC'
+    PublicLoadBalancerListener:
+      Type: 'AWS::ElasticLoadBalancingV2::Listener'
+      DependsOn:
+        - PublicLoadBalancer
+      Properties:
+        DefaultActions:
+          - TargetGroupArn:
+              Ref: 'DummyTargetGroupPublic'
+            Type: 'forward'
+        LoadBalancerArn:
+          Ref: 'PublicLoadBalancer'
+        Port: 80
+        Protocol: HTTP
+    ECSRole:
+      Type: 'AWS::IAM::Role'
+      Metadata:
+        Description: >
+          This is an IAM role which authorizes ECS to manage resources on your
+          account on your behalf, such as updating your load balancer with the
+          details of where your containers are, so that traffic can reach your
+          containers.
+
+          For example, attaching network interfaces to instances on your behalf,
+          in order for awsvpc networking mode to work right.
+
+          And also, to allow ECS to update load balancers on your behalf with
+          the right information about how to send traffic to the containers.
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ecs.amazonaws.com]
+            Action: ['sts:AssumeRole']
+        Path: /
+        Policies:
+        - PolicyName: ecs-service
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:AttachNetworkInterface'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:CreateNetworkInterfacePermission'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'ec2:DeleteNetworkInterfacePermission'
+                  - 'ec2:Describe*'
+                  - 'ec2:DetachNetworkInterface'
+                  - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+                  - 'elasticloadbalancing:DeregisterTargets'
+                  - 'elasticloadbalancing:Describe*'
+                  - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+                  - 'elasticloadbalancing:RegisterTargets'
+                Resource: '*'
+    TaskRole:
+      Type: 'AWS::IAM::Role'
+      Metadata:
+        Description: The thing.
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+        Path: /
+        Policies:
+          - PolicyName: engine-task-role-lambda
+            PolicyDocument:
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'lambda:InvokeFunction'
+                  Resource:
+                    Fn::GetAtt: 'QueryLambdaFunction.Arn'
+    ECSTaskExecutionRole:
+      Type: 'AWS::IAM::Role'
+      Metadata:
+        Description: >
+          These are roles which the ECS hosts are permitted to run!
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ecs-tasks.amazonaws.com]
+            Action: ['sts:AssumeRole']
+        Path: /
+        Policies:
+          - PolicyName: AmazonECSTaskExecutionRolePolicy
+            PolicyDocument:
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'ecr:GetAuthorizationToken'
+                    - 'ecr:BatchCheckLayerAvailability'
+                    - 'ecr:GetDownloadUrlForLayer'
+                    - 'ecr:BatchGetImage'
+                    - 'logs:CreateLogStream'
+                    - 'logs:PutLogEvents'
+                  Resource: '*'
+    CacheSubnetGroup:
+      Type: 'AWS::ElastiCache::SubnetGroup'
+      Properties:
+        Description: Subnets available for the ElastiCache Cluster
+        SubnetIds:
+          - Ref: 'PublicSubnetOne'
+    CacheParameters:
+      Type: 'AWS::ElastiCache::ParameterGroup'
+      Properties:
+        CacheParameterGroupFamily: memcached1.4
+        Description: Parameter group
+    CacheSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Allow access to the cache from the Engine Fargate
+        VpcId:
+          Ref: 'VPC'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '0'
+            ToPort: '65535'
+            SourceSecurityGroupId:
+              Ref: 'FargateContainerSecurityGroup'
+    CacheCluster:
+      Type: 'AWS::ElastiCache::CacheCluster'
+      Properties:
+        CacheSubnetGroupName:
+          Ref: 'CacheSubnetGroup'
+        CacheNodeType: cache.t1.micro
+        VpcSecurityGroupIds:
+          - Ref: 'CacheSecurityGroup'
+        Engine: memcached
+        NumCacheNodes: 2
+    LogGroupTask:
+      Type: 'AWS::Logs::LogGroup'
+      Properties:
+        LogGroupName:
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineLogs' ] ]
+        RetentionInDays: 5
+    TaskDefinition:
+      Type: 'AWS::ECS::TaskDefinition'
+      DependsOn: CacheCluster
+      Properties:
+        Family:
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+        Cpu: 256
+        Memory: 512
+        NetworkMode: awsvpc
+        RequiresCompatibilities:
+          - FARGATE
+        ExecutionRoleArn:
+          Ref: 'ECSTaskExecutionRole'
+        TaskRoleArn:
+          Ref: 'TaskRole'
+        ContainerDefinitions:
+          - Name:
+              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'MagicBox' ] ]
+            Cpu: 128
+            Memory: 256
+            Image: abernix/magic-box:ver-13
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group:
+                  Ref: 'LogGroupTask'
+                awslogs-region:
+                  Ref: 'AWS::Region'
+                awslogs-stream-prefix:
+                  Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'MagicBox' ] ]
+            PortMappings:
+              - ContainerPort: 22
+          - Name:
+              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+            Cpu: 128
+            Memory: 256
+            Image: gcr.io/mdg-public/engine:2018.02-50-gef2fc6d4e
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group:
+                  Ref: 'LogGroupTask'
+                awslogs-region:
+                  Ref: 'AWS::Region'
+                awslogs-stream-prefix:
+                  Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+            PortMappings:
+              - ContainerPort: 80
+            Environment:
+              - Name: ENGINE_CONFIG
+                Value:
+                  # TODO ADD BACK THE CACHE CONFIGURATION IN THE OTHER TAB.
+                  Fn::Sub:
+                    - |-
+                      {
+                        "apiKey": "${EngineApiKey}",
+                        "origins": [
+                          {
+                            "lambda": {
+                              "awsAccessKeyId": "${EngineProxyAccessKey}",
+                              "awsSecretAccessKey": "${EngineProxyAccessKey.SecretAccessKey}",
+                              "functionArn": "${QueryLambdaFunction.Arn}"
+                            }
+                          }
+                        ],
+                        "stores": [
+                          {
+                            "name": "memcacheStore",
+                            "memcache": {
+                              "url": ["${CacheClusterUrls}"],
+                              "keyPrefix": "${CacheClusterKeyPrefix}"
+                            }
+                          }
+                        ],
+                        "queryCache": {
+                          "publicFullQueryStore": "memcacheStore",
+                          "privateFullQueryStore": "memcacheStore"
+                        },
+                        "frontends": [
+                          {
+                            "host": "0.0.0.0",
+                            "port": 80,
+                            "endpoints": ["/graphql", "/staging/graphql", "/production/graphql"]
+                          }
+                        ],
+                        "reporting": {
+                          "endpointUrl": "${ReportingEndpointUrl}",
+                          "debugReports": true
+                        },
+                        "logging": {
+                          "level": "DEBUG"
+                        }
+                      }
+                    - EngineApiKey: ***REMOVED***
+                      CacheClusterKeyPrefix:
+                        Ref: AWS::StackName
+                      ReportingEndpointUrl: https://engine-staging-report.apollodata.com
+                      # TODO/WARN/XXX/DANGER: This is _not_ okay, as I'm not convinced that the IDs fo
+                      # Node's will be just 0001 and 0002.  While they should be at strike time, I'm
+                      # fairly sure that when AWS does maintenance newer Nodes will come into the picture
+                      # and the older will fall stale.  Thus, this deployment might break after the first
+                      # deployment window.
+                      # This isn't too difficult to fix, however the Go Implementation we use in Engine
+                      # doesn't support the auto-discovery endpoint that elasticache exposes.  If we
+                      # to using the following fork, then that might be an option— though this fork is
+                      # a bit abandoned (but frankly, so is the Go Memcache client).
+                      # > https://github.com/Integralist/go-elasticache/
+                      CacheClusterUrls:
+                        Fn::Join:
+                          - '","'
+                          -
+                            - Fn::Join:
+                              - ':'
+                              -
+                                - Fn::Join:
+                                  - '.'
+                                  -
+                                    - Fn::Select:
+                                      - 0
+                                      - Fn::Split:
+                                        - '.'
+                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
+                                    - Fn::Select:
+                                      - 1
+                                      - Fn::Split:
+                                        - '.'
+                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
+                                    - '0001'
+                                    - Fn::Select:
+                                      - 3
+                                      - Fn::Split:
+                                        - '.'
+                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
+                                    - 'cache.amazonaws.com'
+                                - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Port'
+                            - Fn::Join:
+                              - ':'
+                              -
+                                - Fn::Join:
+                                  - '.'
+                                  -
+                                    - Fn::Select:
+                                      - 0
+                                      - Fn::Split:
+                                        - '.'
+                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
+                                    - Fn::Select:
+                                      - 1
+                                      - Fn::Split:
+                                        - '.'
+                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
+                                    - '0002'
+                                    - Fn::Select:
+                                      - 3
+                                      - Fn::Split:
+                                        - '.'
+                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
+                                    - 'cache.amazonaws.com'
+                                - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Port'
+    Service:
+      Type: 'AWS::ECS::Service'
+      DependsOn: LoadBalancerRule
+      Properties:
+        ServiceName:
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+        Cluster:
+          Ref: 'ECSCluster'
+        LaunchType: FARGATE
+        DeploymentConfiguration:
+          MaximumPercent: 200
+          MinimumHealthyPercent: 75
+        DesiredCount: 1
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: ENABLED
+            SecurityGroups:
+              - Ref: 'FargateContainerSecurityGroup'
+            Subnets:
+              - Ref: 'PublicSubnetOne'
+        TaskDefinition:
+          Ref: 'TaskDefinition'
+        LoadBalancers:
+          - ContainerName:
+              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+            ContainerPort: 80
+            TargetGroupArn:
+              Ref: 'TargetGroup'
+    TargetGroup:
+      Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+      Properties:
+        HealthCheckIntervalSeconds: 6
+        HealthCheckPath: /.well-known/apollo/engine-health
+        HealthCheckProtocol: HTTP
+        HealthCheckTimeoutSeconds: 5
+        HealthyThresholdCount: 2
+        TargetType: ip
+        Name:
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+        Port: 80
+        Protocol: HTTP
+        UnhealthyThresholdCount: 2
+        VpcId:
+          Ref: 'VPC'
+
+    # Create a rule on the load balancer for routing traffic to the target group
+    LoadBalancerRule:
+      Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+      Properties:
+        Actions:
+          - TargetGroupArn:
+              Ref: 'TargetGroup'
+            Type: 'forward'
+        Conditions:
+          - Field: path-pattern
+            Values: ['*']
+        ListenerArn:
+          Ref: 'PublicLoadBalancerListener'
+        Priority: 1
+    PrimaryDbSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Allow access to the DB from Lambda
+        VpcId:
+          Ref: 'VPC'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 5432
+            ToPort: 5432
+            # TODO: Wrong.  Should be Lambda
+            SourceSecurityGroupId:
+              Ref: 'FargateContainerSecurityGroup'
+    PrimaryDbParameters:
+      Type: 'AWS::RDS::DBParameterGroup'
+      Properties:
+        Description: Database Parameter Group
+        Family: postgres9.6
+    PrimaryDbSubnetGroup:
+      Type: 'AWS::RDS::DBSubnetGroup'
+      Properties:
+        DBSubnetGroupDescription: Subnets available for the RDS Cluster.
+        SubnetIds:
+          - Ref: 'PublicSubnetOne'
+    PrimaryDb:
+      Type: 'AWS::RDS::DBInstance'
+      Properties:
+        DBName: pgdb
+        AllocatedStorage: 5
+        DBInstanceClass: db.t2.micro
+        Engine: postgres
+        MasterUsername: postgres
+        MasterUserPassword: Password123
+        DBSubnetGroupName:
+          Ref: 'PrimaryDbSubnetGroup'
+        DBParameterGroupName:
+          Ref: 'PrimaryDbParameters'
+        VPCSecurityGroups:
+          - Ref: 'PrimaryDbSecurityGroup'
+      DeletionPolicy: Snapshot
+  Outputs:
+    ExternalUrl:
+      Description: The url of the external load balancer
+      Value:
+        Fn::Join:
+          - ''
+          -
+            - 'http://'
+            - Fn::GetAtt: 'PublicLoadBalancer.DNSName'
