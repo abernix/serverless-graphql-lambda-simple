@@ -18,6 +18,8 @@ resources:
         CIDR: '10.0.0.0/16'
       PublicOne:
         CIDR: '10.0.0.0/24'
+      PublicTwo:
+        CIDR: '10.0.1.0/24'
   Resources:
     VPC:
       Metadata:
@@ -48,6 +50,23 @@ resources:
           Ref: 'VPC'
         CidrBlock:
           Fn::FindInMap: ['SubnetConfig', 'PublicOne', 'CIDR']
+        MapPublicIpOnLaunch: true
+    PublicSubnetTwo:
+      Type: 'AWS::EC2::Subnet'
+      Metadata:
+        Description: >
+          One of two public subnets where containers will have
+          public IP addresses, and will route through the internet gateway
+      Properties:
+        AvailabilityZone:
+          Fn::Select:
+            - 1
+            - Fn::GetAZs:
+                Ref: 'AWS::Region'
+        VpcId:
+          Ref: 'VPC'
+        CidrBlock:
+          Fn::FindInMap: ['SubnetConfig', 'PublicTwo', 'CIDR']
         MapPublicIpOnLaunch: true
     InternetGateway:
       Type: 'AWS::EC2::InternetGateway'
@@ -87,6 +106,13 @@ resources:
       Properties:
         SubnetId:
           Ref: 'PublicSubnetOne'
+        RouteTableId:
+          Ref: 'PublicRouteTable'
+    PublicSubnetTwoRouteTableAssociation:
+      Type: 'AWS::EC2::SubnetRouteTableAssociation'
+      Properties:
+        SubnetId:
+          Ref: 'PublicSubnetTwo'
         RouteTableId:
           Ref: 'PublicRouteTable'
     NatGatewayOneAttachment:
@@ -194,6 +220,7 @@ resources:
             Value: '30'
         Subnets:
           - Ref: 'PublicSubnetOne'
+          - Ref: 'PublicSubnetTwo'
         SecurityGroups:
           - Ref: 'PublicLoadBalancerSG'
     DummyTargetGroupPublic:
