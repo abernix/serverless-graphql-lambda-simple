@@ -349,39 +349,6 @@ resources:
                     - 'logs:CreateLogStream'
                     - 'logs:PutLogEvents'
                   Resource: '*'
-    CacheSubnetGroup:
-      Type: 'AWS::ElastiCache::SubnetGroup'
-      Properties:
-        Description: Subnets available for the ElastiCache Cluster
-        SubnetIds:
-          - Ref: 'PublicSubnetOne'
-    CacheParameters:
-      Type: 'AWS::ElastiCache::ParameterGroup'
-      Properties:
-        CacheParameterGroupFamily: memcached1.4
-        Description: Parameter group
-    CacheSecurityGroup:
-      Type: 'AWS::EC2::SecurityGroup'
-      Properties:
-        GroupDescription: Allow access to the cache from the Engine Fargate
-        VpcId:
-          Ref: 'VPC'
-        SecurityGroupIngress:
-          - IpProtocol: tcp
-            FromPort: '0'
-            ToPort: '65535'
-            SourceSecurityGroupId:
-              Ref: 'FargateContainerSecurityGroup'
-    CacheCluster:
-      Type: 'AWS::ElastiCache::CacheCluster'
-      Properties:
-        CacheSubnetGroupName:
-          Ref: 'CacheSubnetGroup'
-        CacheNodeType: cache.t1.micro
-        VpcSecurityGroupIds:
-          - Ref: 'CacheSecurityGroup'
-        Engine: memcached
-        NumCacheNodes: 2
     LogGroupTask:
       Type: 'AWS::Logs::LogGroup'
       Properties:
@@ -390,7 +357,6 @@ resources:
         RetentionInDays: 5
     TaskDefinition:
       Type: 'AWS::ECS::TaskDefinition'
-      DependsOn: CacheCluster
       Properties:
         Family:
           Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
@@ -453,19 +419,6 @@ resources:
                             }
                           }
                         ],
-                        "stores": [
-                          {
-                            "name": "memcacheStore",
-                            "memcache": {
-                              "url": ["${CacheClusterUrls}"],
-                              "keyPrefix": "${CacheClusterKeyPrefix}"
-                            }
-                          }
-                        ],
-                        "queryCache": {
-                          "publicFullQueryStore": "memcacheStore",
-                          "privateFullQueryStore": "memcacheStore"
-                        },
                         "frontends": [
                           {
                             "host": "0.0.0.0",
@@ -482,71 +435,7 @@ resources:
                         }
                       }
                     - EngineApiKey: ***REMOVED***
-                      CacheClusterKeyPrefix:
-                        Ref: AWS::StackName
                       ReportingEndpointUrl: https://engine-staging-report.apollodata.com
-                      # TODO/WARN/XXX/DANGER: This is _not_ okay, as I'm not convinced that the IDs fo
-                      # Node's will be just 0001 and 0002.  While they should be at strike time, I'm
-                      # fairly sure that when AWS does maintenance newer Nodes will come into the picture
-                      # and the older will fall stale.  Thus, this deployment might break after the first
-                      # deployment window.
-                      # This isn't too difficult to fix, however the Go Implementation we use in Engine
-                      # doesn't support the auto-discovery endpoint that elasticache exposes.  If we
-                      # to using the following fork, then that might be an option— though this fork is
-                      # a bit abandoned (but frankly, so is the Go Memcache client).
-                      # > https://github.com/Integralist/go-elasticache/
-                      CacheClusterUrls:
-                        Fn::Join:
-                          - '","'
-                          -
-                            - Fn::Join:
-                              - ':'
-                              -
-                                - Fn::Join:
-                                  - '.'
-                                  -
-                                    - Fn::Select:
-                                      - 0
-                                      - Fn::Split:
-                                        - '.'
-                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
-                                    - Fn::Select:
-                                      - 1
-                                      - Fn::Split:
-                                        - '.'
-                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
-                                    - '0001'
-                                    - Fn::Select:
-                                      - 3
-                                      - Fn::Split:
-                                        - '.'
-                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
-                                    - 'cache.amazonaws.com'
-                                - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Port'
-                            - Fn::Join:
-                              - ':'
-                              -
-                                - Fn::Join:
-                                  - '.'
-                                  -
-                                    - Fn::Select:
-                                      - 0
-                                      - Fn::Split:
-                                        - '.'
-                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
-                                    - Fn::Select:
-                                      - 1
-                                      - Fn::Split:
-                                        - '.'
-                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
-                                    - '0002'
-                                    - Fn::Select:
-                                      - 3
-                                      - Fn::Split:
-                                        - '.'
-                                        - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Address'
-                                    - 'cache.amazonaws.com'
-                                - Fn::GetAtt: 'CacheCluster.ConfigurationEndpoint.Port'
     Service:
       Type: 'AWS::ECS::Service'
       DependsOn: LoadBalancerRule
