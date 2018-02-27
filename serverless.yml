@@ -606,46 +606,6 @@ resources:
         ListenerArn:
           Ref: 'PublicLoadBalancerListener'
         Priority: 1
-    PrimaryDbSecurityGroup:
-      Type: 'AWS::EC2::SecurityGroup'
-      Properties:
-        GroupDescription: Allow access to the DB from Lambda
-        VpcId:
-          Ref: 'VPC'
-        SecurityGroupIngress:
-          - IpProtocol: tcp
-            FromPort: 5432
-            ToPort: 5432
-            # TODO: Wrong.  Should be Lambda
-            SourceSecurityGroupId:
-              Ref: 'FargateContainerSecurityGroup'
-    PrimaryDbParameters:
-      Type: 'AWS::RDS::DBParameterGroup'
-      Properties:
-        Description: Database Parameter Group
-        Family: postgres9.6
-    PrimaryDbSubnetGroup:
-      Type: 'AWS::RDS::DBSubnetGroup'
-      Properties:
-        DBSubnetGroupDescription: Subnets available for the RDS Cluster.
-        SubnetIds:
-          - Ref: 'PublicSubnetOne'
-    PrimaryDb:
-      Type: 'AWS::RDS::DBInstance'
-      Properties:
-        DBName: pgdb
-        AllocatedStorage: 5
-        DBInstanceClass: db.t2.micro
-        Engine: postgres
-        MasterUsername: postgres
-        MasterUserPassword: Password123
-        DBSubnetGroupName:
-          Ref: 'PrimaryDbSubnetGroup'
-        DBParameterGroupName:
-          Ref: 'PrimaryDbParameters'
-        VPCSecurityGroups:
-          - Ref: 'PrimaryDbSecurityGroup'
-      DeletionPolicy: Snapshot
   Outputs:
     ExternalUrl:
       Description: The url of the external load balancer
