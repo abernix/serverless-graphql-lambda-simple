@@ -58,4 +58,14 @@ describe("query", function () {
         });
     });
   });
+
+  describe("engineHealth", function () {
+    it("returns true (TODO)", () => {
+      return wrapped
+        .run(queryAsLambdaEvent(`{ engineHealth }`))
+        .then(({ body }) => {
+          expect(JSON.parse(body).data.engineHealth).to.be.true;
+        });
+    });
+  });
 });
