@@ -452,6 +452,9 @@ resources:
         DesiredCount: 1
         NetworkConfiguration:
           AwsvpcConfiguration:
+            # Since we aren't using a NAT gateway for the private interface,
+            # the instance needs a public IP so it can download the actual
+            # Docker images!
             AssignPublicIp: ENABLED
             SecurityGroups:
               - Ref: 'FargateContainerSecurityGroup'
