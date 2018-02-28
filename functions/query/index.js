@@ -9,8 +9,6 @@ const {
 
 const { executeGqlLambda } = require("../helpers.js");
 
-const getGreeting = firstName => `Hello, ${firstName}.`;
-
 const schema = new GraphQLSchema({
   query: new GraphQLObjectType({
     name: 'RootQueryType',
@@ -25,7 +23,7 @@ const schema = new GraphQLSchema({
         type: GraphQLString,
         resolve: (parent, args, haveNotLookedUpWhatThisIsTODO, { cacheControl }) => {
           cacheControl.setCacheHint({maxAge: 60});
-          return getGreeting(args.firstName);
+          return `Hello, ${args.firstName}.`;
         },
       },
       engineHealth: {
