@@ -9,7 +9,7 @@ provider:
 
 functions:
   query:
-    handler: handler.query
+    handler: functions/query/index.default
 
 resources:
   Mappings:

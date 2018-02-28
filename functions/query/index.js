@@ -1,5 +1,5 @@
-/* handler.js */
 const {
+  GraphQLBoolean,
   GraphQLSchema,
   GraphQLObjectType,
   GraphQLString,
@@ -7,29 +7,30 @@ const {
   GraphQLDirective,
 } = require('graphql')
 
-// This method just inserts the user's first name into the greeting message.
 const getGreeting = firstName => `Hello, ${firstName}.`;
 
-// Here we declare the schema and resolvers for the query
 const schema = new GraphQLSchema({
   query: new GraphQLObjectType({
-    name: 'RootQueryType', // an arbitrary name
+    name: 'RootQueryType',
     fields: {
-      // the query has a field called 'greeting'
       greeting: {
-        // we need to know the user's name to greet them
         args: {
           firstName: {
             name: 'firstName',
             type: new GraphQLNonNull(GraphQLString),
           },
         },
-        // the greeting message is a string
         type: GraphQLString,
-        // resolve to a greeting message
-        resolve: (parent, args, blah, { cacheControl }) => {
+        resolve: (parent, args, haveNotLookedUpWhatThisIsTODO, { cacheControl }) => {
           cacheControl.setCacheHint({maxAge: 60});
           return getGreeting(args.firstName);
+        },
+      },
+      engineHealth: {
+        type: GraphQLString,
+        resolve: (parent, args, haveNotLookedUpWhatThisIsTODO, { cacheControl }) => {
+          cacheControl.setCacheHint({maxAge: 60});
+          return false;
         },
       }
     }
@@ -43,19 +44,19 @@ function queryFromEvent(event) {
 
   if (typeof event.body === "string") {
     try {
-      console.log("Ok, it's a string, turning it into JSON.");
+      // console.log("Ok, it's a string, turning it into JSON.");
       const potentialBody = JSON.parse(event.body);
       if (potentialBody.query) {
         return potentialBody.query;
       }
       return potentialBody;
     } catch (err) {
-      console.log("The event.body was not well-formed JSON.");
+      // console.log("The event.body was not well-formed JSON.");
     }
   }
 
   if (typeof event.body === "object") {
-    console.log("looks like an object");
+    // console.log("looks like an object");
     return event.body;
   }
 
@@ -76,7 +77,7 @@ function wrappedMethod(method) {
   }
 }
 
-module.exports.query =
+module.exports.default =
   wrappedMethod((event, context) => {
       const headers = event.headers;
       const functionName = context.functionName;
