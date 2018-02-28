@@ -161,7 +161,7 @@ resources:
           of the security group.
       Properties:
         GroupDescription: Access to the Fargate containers
-        # TODO GET RID OF THIS.
+        # TODO: Debugging.  Get rid of this!
         SecurityGroupIngress:
           -
             IpProtocol: tcp
@@ -405,7 +405,6 @@ resources:
             Environment:
               - Name: ENGINE_CONFIG
                 Value:
-                  # TODO ADD BACK THE CACHE CONFIGURATION IN THE OTHER TAB.
                   Fn::Sub:
                     - |-
                       {
