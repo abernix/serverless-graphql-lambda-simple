@@ -1,6 +1,6 @@
 frameworkVersion: ">=1.21.0 <2.0.0"
 
-service: graphql-simple
+service: graphqlez
 provider:
   name: aws
   runtime: nodejs6.10
