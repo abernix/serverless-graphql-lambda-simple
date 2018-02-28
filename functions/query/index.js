@@ -32,7 +32,13 @@ const schema = new GraphQLSchema({
           cacheControl.setCacheHint({maxAge: 60});
           return false;
         },
-      }
+      },
+      debug: {
+        type: GraphQLString,
+        resolve: () => {
+          return JSON.stringify(process.env);
+        },
+      },
     }
   }),
 })

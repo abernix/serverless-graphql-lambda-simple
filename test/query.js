@@ -68,4 +68,14 @@ describe("query", function () {
         });
     });
   });
+
+  describe("debug", function () {
+    it("returns anything", () => {
+      return wrapped
+        .run(queryAsLambdaEvent(`{ debug }`))
+        .then(({ body }) => {
+          expect(JSON.parse(body).data.debug).to.be.a("string");
+        });
+    });
+  });
 });
