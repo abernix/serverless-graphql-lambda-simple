@@ -452,7 +452,7 @@ resources:
         DeploymentConfiguration:
           MaximumPercent: 200
           MinimumHealthyPercent: 75
-        DesiredCount: 1
+        DesiredCount: 2
         NetworkConfiguration:
           AwsvpcConfiguration:
             # Since we aren't using a NAT gateway for the private interface,
