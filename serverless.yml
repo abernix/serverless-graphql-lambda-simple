@@ -455,6 +455,7 @@ resources:
               - Ref: 'FargateContainerSecurityGroup'
             Subnets:
               - Ref: 'PublicSubnetOne'
+              - Ref: 'PublicSubnetTwo'
         TaskDefinition:
           Ref: 'TaskDefinition'
         LoadBalancers:
