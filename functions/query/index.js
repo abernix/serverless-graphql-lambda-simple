@@ -29,7 +29,7 @@ const schema = new GraphQLSchema({
         },
       },
       engineHealth: {
-        type: GraphQLString,
+        type: GraphQLBoolean,
         resolve: (parent, args, haveNotLookedUpWhatThisIsTODO, { cacheControl }) => {
           cacheControl.setCacheHint({maxAge: 60});
           return false;
