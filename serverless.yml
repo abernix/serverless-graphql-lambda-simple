@@ -133,7 +133,9 @@ resources:
     EngineProxyUser:
       Type: 'AWS::IAM::User'
       Metadata:
-        Description: Make a user, because.
+        Description: >
+          Currently, due to a bug, the Engine Proxy doesn't respect the
+          ECSRole, which requires us to provision a user to invoke the lambda.
       Properties:
         Policies:
           - PolicyName: engine-proxy-execute-lambda
