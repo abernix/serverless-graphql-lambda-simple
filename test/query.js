@@ -60,21 +60,11 @@ describe("query", function () {
   });
 
   describe("engineHealth", function () {
-    it("returns true (TODO)", () => {
+    it("returns a boolean", () => {
       return wrapped
         .run(queryAsLambdaEvent(`{ engineHealth }`))
         .then(({ body }) => {
-          expect(JSON.parse(body).data.engineHealth).to.be.true;
-        });
-    });
-  });
-
-  describe("debug", function () {
-    it("returns anything", () => {
-      return wrapped
-        .run(queryAsLambdaEvent(`{ debug }`))
-        .then(({ body }) => {
-          expect(JSON.parse(body).data.debug).to.be.a("string");
+          expect(JSON.parse(body).data.engineHealth).to.be.a("boolean");
         });
     });
   });
