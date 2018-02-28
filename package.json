@@ -14,9 +14,12 @@
     "destroy": "serverless remove",
     "invoke:provider": "serverless invoke -f query -p ./query-invoke.json",
     "invoke:local": "serverless invoke local -f query -p ./query-invoke.json",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "sls invoke test",
+    "test:watch": "nodemon -w functions/ -w test/ --exec 'npm test --'"
   },
   "devDependencies": {
-    "serverless": "^1.26.0"
+    "nodemon": "^1.17.1",
+    "serverless": "^1.26.0",
+    "serverless-mocha-plugin": "^1.7.0"
   }
 }
