@@ -382,6 +382,7 @@ resources:
         TaskRoleArn:
           Ref: 'TaskRole'
         ContainerDefinitions:
+          # TODO Remove this container, which is used for debugging.
           - Name:
               Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'MagicBox' ] ]
             Cpu: 128
