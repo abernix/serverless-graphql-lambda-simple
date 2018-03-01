@@ -6,6 +6,13 @@ provider:
   runtime: nodejs6.10
   region: us-east-1
   variableSyntax: "\\%{([ ~:a-zA-Z0-9._\\'\",\\-\\/\\(\\)]+?)}"
+  environment:
+    ENGINE_PROXY_URL:
+      Fn::Join:
+          - ''
+          -
+            - 'http://'
+            - Fn::GetAtt: 'PublicLoadBalancer.DNSName'
 
 plugins:
   - serverless-mocha-plugin
@@ -13,9 +20,6 @@ plugins:
 functions:
   query:
     handler: functions/query/index.default
-    environment:
-      ENGINE_PROXY_URL:
-        'Fn::ImportValue': 'ExternalUrl'
 
 resources:
   Mappings:
@@ -515,5 +519,3 @@ resources:
           -
             - 'http://'
             - Fn::GetAtt: 'PublicLoadBalancer.DNSName'
-      Export:
-        Name: ExternalUrl
