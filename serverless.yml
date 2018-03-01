@@ -1,6 +1,11 @@
 frameworkVersion: ">=1.21.0 <2.0.0"
 
-service: graphqlez
+custom:
+  apollo:
+    engineApiKey: ***REMOVED***
+    reportingEndpointUrl: https://engine-staging-report.apollodata.com
+
+service: apollo-engine-simple
 provider:
   name: aws
   runtime: nodejs6.10
@@ -446,8 +451,8 @@ resources:
                           "level": "DEBUG"
                         }
                       }
-                    - EngineApiKey: ***REMOVED***
-                      ReportingEndpointUrl: https://engine-staging-report.apollodata.com
+                    - EngineApiKey: '%{self:custom.apollo.engineApiKey}'
+                      ReportingEndpointUrl: "%{self:custom.apollo.reportingEndpointUrl, 'https://engine-report.apollodata.com'}"
     Service:
       Type: 'AWS::ECS::Service'
       DependsOn: LoadBalancerRule

@@ -25,6 +25,21 @@ describe("query", function () {
     })
   });
 
+  describe("graphiql", () => {
+    it("returns the graphiql tool", () => {
+      const graphiqlRequest = {
+        path: "/graphiql"
+      };
+
+      return wrapped.run(graphiqlRequest).then((response) => {
+        expect(response).to.not.be.empty;
+        expect(response.statusCode).to.equal(200);
+        expect(response.headers).to.include({ "Content-Type": "text/html"});
+        expect(response.body).to.not.be.empty;
+      });
+    });
+  });
+
   describe("greeting", function () {
     const runWithName = (name = "Anyone") =>
       wrapped.run(queryAsLambdaEvent(`{ greeting(firstName: "${name}") }`));
