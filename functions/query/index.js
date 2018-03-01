@@ -77,4 +77,6 @@ module.exports.default =
         tracing: true,
         cacheControl: true,
       }
+    }, {
+      graphiql: true
     });

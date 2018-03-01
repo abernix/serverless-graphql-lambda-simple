@@ -1,3 +1,8 @@
+const {
+  graphqlLambda,
+  graphiqlLambda,
+} = require("apollo-server-lambda");
+
 function queryFromEvent(event) {
   if (!event) {
     throw new Error("There was no event, so we don't know what to do.");
@@ -24,20 +29,27 @@ function queryFromEvent(event) {
   throw new Error("None of event types contained a query?");
 }
 
-function executeGqlLambda(method) {
-  return function (event, context, callback) {
-    // console.log("EVENT", typeof event, event);
-    // console.log("CONTEXT", context);
+function executeGqlLambda(method, options = {}) {
+  return function (...args) {
+    // So we can use them locally, but still pass `args` directly.
+    const [event] = args;
+
+    if (options.graphiql &&
+      event.path &&
+      event.path.startsWith("/graphiql")) {
+      return graphiqlLambda({
+        endpointURL: process.env.ENGINE_PROXY_URL,
+      })(...args);
+    }
+
     const query = queryFromEvent(event);
-    // console.log("QUERY", query);
 
     // This forces the otherwise Lambda shaped query into what Apollo Server
     // expects (it refuses to process it otherwise!)
     event.httpMethod = 'POST';
     event.body = JSON.stringify({ query });
 
-    return require('apollo-server-lambda')
-      .graphqlLambda(method)(event, context, callback);
+    return graphqlLambda(method)(...args);
   }
 }
 
