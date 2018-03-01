@@ -136,7 +136,7 @@ resources:
           Fn::GetAtt: NatGatewayOneAttachment.AllocationId
         SubnetId:
           Ref: 'PublicSubnetOne'
-    EngineProxyUser:
+    EngineUser:
       Type: 'AWS::IAM::User'
       Metadata:
         Description: >
@@ -152,11 +152,11 @@ resources:
                     - 'lambda:InvokeFunction'
                   Resource:
                     Fn::GetAtt: 'QueryLambdaFunction.Arn'
-    EngineProxyAccessKey:
+    EngineAccessKey:
       Type: 'AWS::IAM::AccessKey'
       Properties:
         UserName:
-          Ref: 'EngineProxyUser'
+          Ref: 'EngineUser'
     ECSCluster:
       Type: 'AWS::ECS::Cluster'
     FargateContainerSecurityGroup:
@@ -367,7 +367,7 @@ resources:
       Type: 'AWS::ECS::TaskDefinition'
       Properties:
         Family:
-          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
         Cpu: 256
         Memory: 512
         NetworkMode: awsvpc
@@ -395,7 +395,7 @@ resources:
             PortMappings:
               - ContainerPort: 22
           - Name:
-              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
             Cpu: 128
             Memory: 256
             Image: gcr.io/mdg-public/engine:2018.02-50-gef2fc6d4e
@@ -407,7 +407,7 @@ resources:
                 awslogs-region:
                   Ref: 'AWS::Region'
                 awslogs-stream-prefix:
-                  Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+                  Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
             PortMappings:
               - ContainerPort: 80
             Environment:
@@ -420,8 +420,8 @@ resources:
                         "origins": [
                           {
                             "lambda": {
-                              "awsAccessKeyId": "${EngineProxyAccessKey}",
-                              "awsSecretAccessKey": "${EngineProxyAccessKey.SecretAccessKey}",
+                              "awsAccessKeyId": "${EngineAccessKey}",
+                              "awsSecretAccessKey": "${EngineAccessKey.SecretAccessKey}",
                               "functionArn": "${QueryLambdaFunction.Arn}"
                             }
                           }
@@ -448,7 +448,7 @@ resources:
       DependsOn: LoadBalancerRule
       Properties:
         ServiceName:
-          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
         Cluster:
           Ref: 'ECSCluster'
         LaunchType: FARGATE
@@ -471,7 +471,7 @@ resources:
           Ref: 'TaskDefinition'
         LoadBalancers:
           - ContainerName:
-              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+              Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
             ContainerPort: 80
             TargetGroupArn:
               Ref: 'TargetGroup'
@@ -485,7 +485,7 @@ resources:
         HealthyThresholdCount: 2
         TargetType: ip
         Name:
-          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'EngineProxy' ] ]
+          Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
         Port: 80
         Protocol: HTTP
         UnhealthyThresholdCount: 2
