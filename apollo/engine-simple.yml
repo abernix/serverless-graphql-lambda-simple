@@ -458,3 +458,7 @@ resources:
         ListenerArn:
           Ref: 'PublicLoadBalancerListener'
         Priority: 1
+  Outputs:
+    EngineProxy:
+      Description: The url of the Engine proxy, ready to serve!
+      Value: '%{file(apollo/helpers.yml):engineProxyUrl}'

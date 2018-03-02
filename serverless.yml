@@ -47,10 +47,3 @@ resources:
   # This implements a simple, public-only network with no private resources.
   # Other options can be added in the future.
   - '%{file(apollo/engine-simple.yml):resources}'
-
-  # This allows the stack to print the new URL of the stack so you can
-  # start playing with it as soon as it comes up!
-  - Outputs:
-      ExternalUrl:
-        Description: The url of the Engine proxy, ready to serve!
-        Value: '%{file(apollo/helpers.yml):engineProxyUrl}'
