@@ -60,3 +60,8 @@ resources:
   # This simple deployment implements a public-only network with no
   # private resources.
   # - '%{file(apollo/engine-simple.yml):resources}'
+
+  # This alternative option also includes a Memcached cluster, allowing
+  # multiple Engine proxy deployments to share their cache (and offload
+  # their memory consumption!)
+  - '%{file(apollo/engine-with-cache.yml):resources}'
