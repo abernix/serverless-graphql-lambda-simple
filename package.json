@@ -14,8 +14,6 @@
   "scripts": {
     "deploy": "serverless deploy",
     "destroy": "serverless remove",
-    "invoke:provider": "serverless invoke -f query -p ./query-invoke.json",
-    "invoke:local": "serverless invoke local -f query -p ./query-invoke.json",
     "test": "sls invoke test",
     "test:watch": "nodemon -w functions/ -w test/ --exec 'npm test --'"
   },
