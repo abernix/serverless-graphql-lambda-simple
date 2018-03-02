@@ -1,5 +1,6 @@
 {
   "name": "serverless-graphql-lambda-simple",
+  "private": true,
   "version": "1.0.0",
   "description": "",
   "keywords": [],
