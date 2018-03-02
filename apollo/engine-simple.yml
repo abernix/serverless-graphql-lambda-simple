@@ -445,8 +445,6 @@ resources:
         UnhealthyThresholdCount: 2
         VpcId:
           Ref: 'VPC'
-
-    # Create a rule on the load balancer for routing traffic to the target group
     LoadBalancerRule:
       Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
       Properties:
