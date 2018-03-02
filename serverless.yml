@@ -9,10 +9,7 @@ custom:
   apollo:
     # This is the Engine API key.  Create yours at:
     #  https://engine.apollographql.com/
-    engineApiKey: ***REMOVED***
-
-    # This is for using our staging server.
-    reportingEndpointUrl: https://engine-staging-report.apollodata.com
+    engineApiKey: !YOUR_KEY_HERE!
 
 # This is the custom name of your service.  You can run multiple services
 # however should use a different name, within regions.
