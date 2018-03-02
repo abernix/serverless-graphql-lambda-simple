@@ -1,0 +1,7 @@
+---
+engineProxyUrl:
+  Fn::Join:
+    - ''
+    -
+      - 'http://'
+      - Fn::GetAtt: 'PublicLoadBalancer.DNSName'
