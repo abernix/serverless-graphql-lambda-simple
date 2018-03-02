@@ -1,3 +1,4 @@
+const { resolve: urlResolve } = require("url");
 const {
   graphqlLambda,
   graphiqlLambda,
@@ -37,9 +38,11 @@ function executeGqlLambda(method, options = {}) {
     if (options.graphiql &&
       event.path &&
       event.path.startsWith("/graphiql")) {
-      return graphiqlLambda({
-        endpointURL: process.env.ENGINE_PROXY_URL,
-      })(...args);
+
+      const endpointURL =
+        urlResolve(process.env.ENGINE_PROXY_URL, "/graphql");
+
+      return graphiqlLambda({ endpointURL })(...args);
     }
 
     const query = queryFromEvent(event);
