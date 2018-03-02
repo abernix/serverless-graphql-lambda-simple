@@ -13,8 +13,8 @@
     "request-promise-native": "^1.0.5"
   },
   "scripts": {
-    "deploy": "serverless deploy",
-    "rip": "serverless remove",
+    "deploy": "serverless deploy -v",
+    "rip": "serverless remove -v",
     "test": "sls invoke test",
     "test:watch": "nodemon -w functions/ -w test/ --exec 'npm test --'"
   },
