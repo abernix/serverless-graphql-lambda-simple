@@ -7,8 +7,15 @@
 3. Set your Engine API key in the `engineApiKey` field within the [`serverless.yml`](./serverless.yml#L12) file.
 4. Ensure your AWS credentials are available in your environment.
    * Since Serverless uses standard AWS protocol behind the scenes, this means ensuring that both `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are set in your environment, or the `AWS_PROFILE` environment variable which points to named profile in your [shared AWS credentials](https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file).  You probably have this set already, but make sure it's the right one!
+5. Pick a deployment model.
+    1. A basic deployment.
+    2. A Memcache-backed deployment.
 5. `npm run deploy`
+
+## Deployment
+
+Updates to the resolvers on already deployed stacks generally take a matter of seconds, but the initial deployment can take some time (about 5-10 minutes) as AWS provisions and deploys services.  This includes network infrastructure, Elastic Container Service clusters and the Docker containers themselves.
 
 ## Cleaning up
 
-1. **Careful!** Run `npm run rip` to remove the entire deployment.  This is great for quickly launching a deployment for experimentation!
+1. **Careful!** Run `npm run rip` to remove the entire deployment.  This is great for quickly launching a deployment for experimentation and thoroughly cleaning it up!
