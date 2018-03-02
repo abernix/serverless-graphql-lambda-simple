@@ -2,18 +2,31 @@
 frameworkVersion: ">=1.21.0 <2.0.0"
 
 plugins:
-  # Running `npm test` will run tests directly against the Lambda handler.
+  # Running `npm test` will run tests directly against the Lambda handler
+  # and `npm test:watch` will run the tests on each change!
   - serverless-mocha-plugin
 
+# This is the custom name of your service.  You can run multiple services,
+# however each should use a different name within the same region.
+service: apollo-engine
+
+#
+# Configuration Parameters
+#
 custom:
   apollo:
     # This is the Engine API key.  Create yours at:
     #  https://engine.apollographql.com/
-    engineApiKey: !YOUR_KEY_HERE!
+    engineApiKey: !YOUR_API_KEY!
 
-# This is the custom name of your service.  You can run multiple services
-# however should use a different name, within regions.
-service: apollo-engine-simple
+#
+# Resolvers
+#
+functions:
+  # This resolver code lives in the similarly named path and export!
+  query:
+    handler: functions/query/index.default
+
 
 provider:
   # This only supports AWS at the moment!
@@ -38,12 +51,12 @@ provider:
     # which is used by the `engineHealth` query.
     ENGINE_PROXY_URL: '%{file(apollo/helpers.yml):engineProxyUrl}'
 
-functions:
-  # This resolver code lives in the similarly named path and export!
-  query:
-    handler: functions/query/index.default
-
 resources:
-  # This implements a simple, public-only network with no private resources.
-  # Other options can be added in the future.
-  - '%{file(apollo/engine-simple.yml):resources}'
+  #
+  # IMPORTANT: You can pick from one of the configuration files here,
+  # though only one should be enabled at a time!
+  #
+
+  # This simple deployment implements a public-only network with no
+  # private resources.
+  # - '%{file(apollo/engine-simple.yml):resources}'
