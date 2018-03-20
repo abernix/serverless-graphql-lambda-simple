@@ -594,18 +594,10 @@ resources:
                               "url": ["${CacheClusterUrls}"],
                               "keyPrefix": "public:"
                             }
-                          },
-                          {
-                            "name": "memcacheStorePrivate",
-                            "memcache": {
-                              "url": ["${CacheClusterUrls}"],
-                              "keyPrefix": "private:"
-                            }
                           }
                         ],
                         "queryCache": {
-                          "publicFullQueryStore": "memcacheStorePublic",
-                          "privateFullQueryStore": "memcacheStorePrivate"
+                          "publicFullQueryStore": "memcacheStorePublic"
                         },
                         "frontends": [
                           {
