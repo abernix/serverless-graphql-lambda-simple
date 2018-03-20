@@ -208,27 +208,6 @@ resources:
           Ref: 'PrivateRouteTableTwo'
         SubnetId:
           Ref: 'PrivateSubnetTwo'
-    EngineUser:
-      Type: 'AWS::IAM::User'
-      Metadata:
-        Description: >
-          Currently, due to a bug, the Engine Proxy doesn't respect the
-          ECSRole, which requires us to provision a user to invoke the lambda.
-      Properties:
-        Policies:
-          - PolicyName: engine-proxy-execute-lambda
-            PolicyDocument:
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - 'lambda:InvokeFunction'
-                  Resource:
-                    Fn::GetAtt: 'QueryLambdaFunction.Arn'
-    EngineAccessKey:
-      Type: 'AWS::IAM::AccessKey'
-      Properties:
-        UserName:
-          Ref: 'EngineUser'
     ECSCluster:
       Type: 'AWS::ECS::Cluster'
     FargateContainerSecurityGroup:
@@ -581,8 +560,6 @@ resources:
                         "origins": [
                           {
                             "lambda": {
-                              "awsAccessKeyId": "${EngineAccessKey}",
-                              "awsSecretAccessKey": "${EngineAccessKey.SecretAccessKey}",
                               "functionArn": "${QueryLambdaFunction.Arn}"
                             }
                           }
