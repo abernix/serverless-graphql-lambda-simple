@@ -559,7 +559,7 @@ resources:
               Fn::Join: [ '-', [ Ref: 'AWS::StackName', 'Engine' ] ]
             Cpu: 256
             Memory: 512
-            Image: gcr.io/mdg-public/engine:2018.02-50-gef2fc6d4e
+            Image: gcr.io/mdg-public/engine:1
             LogConfiguration:
               LogDriver: awslogs
               Options:
@@ -594,18 +594,10 @@ resources:
                               "url": ["${CacheClusterUrls}"],
                               "keyPrefix": "public:"
                             }
-                          },
-                          {
-                            "name": "memcacheStorePrivate",
-                            "memcache": {
-                              "url": ["${CacheClusterUrls}"],
-                              "keyPrefix": "private:"
-                            }
                           }
                         ],
                         "queryCache": {
-                          "publicFullQueryStore": "memcacheStorePublic",
-                          "privateFullQueryStore": "memcacheStorePrivate"
+                          "publicFullQueryStore": "memcacheStorePublic"
                         },
                         "frontends": [
                           {
